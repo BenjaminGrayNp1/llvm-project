@@ -1150,10 +1150,25 @@ getSemanticHighlightings(ParsedAST &AST, bool IncludeInactiveRegionTokens) {
     Filter.disableKind(HighlightingKind::InactiveCode);
   // Add highlightings for AST nodes.
   HighlightingsBuilder Builder(AST, Filter);
-  // Highlight 'decltype' and 'auto' as their underlying types.
-  CollectExtraHighlightings(Builder).TraverseAST(C);
-  // Highlight all decls and references coming from the AST.
-  findExplicitReferences(
+
+  if (auto *AsmAST = AST.getAsmAst()) {
+    auto *AsmMemStart = AsmAST->TokenBuffer->AsmBuffer.data();
+
+    for (const auto &AI : AsmAST->Str->InstructionsWithArgc) {
+      auto AsmOffset = AI.Inst.getLoc().getPointer() - AsmMemStart;
+
+      auto Token = AsmAST->TokenBuffer->getToken(AsmOffset);
+
+      if (!Token || Token->location().isMacroID())
+        continue;
+
+      Builder.addToken(Token->location(), HighlightingKind::Function);
+    }
+  } else {
+    // Highlight 'decltype' and 'auto' as their underlying types.
+    CollectExtraHighlightings(Builder).TraverseAST(C);
+    // Highlight all decls and references coming from the AST.
+    findExplicitReferences(
       C,
       [&](ReferenceLoc R) {
         for (const NamedDecl *Decl : R.Targets) {
@@ -1199,6 +1214,7 @@ getSemanticHighlightings(ParsedAST &AST, bool IncludeInactiveRegionTokens) {
         }
       },
       AST.getHeuristicResolver());
+  }
   // Add highlightings for macro references.
   auto AddMacro = [&](const MacroOccurrence &M) {
     auto &T = Builder.addToken(M.toRange(C.getSourceManager()),
