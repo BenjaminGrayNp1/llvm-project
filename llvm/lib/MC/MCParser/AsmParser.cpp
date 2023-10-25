@@ -2377,6 +2377,11 @@ bool AsmParser::parseAndMatchAndEmitTargetInstruction(ParseStatementInfo &Info,
             IDLoc, Info.Opcode, Info.ParsedOperands, Out, ErrorInfo,
             getTargetParser().isParsingMSInlineAsm()))
       return true;
+
+    if (EmitInstructionOperands != nullptr) {
+      EmitInstructionOperands(std::move(Info.ParsedOperands), EmitInstructionOperandsContext);
+      Info.ParsedOperands.clear();
+    }
   }
   return false;
 }

@@ -15,6 +15,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/MC/MCAsmMacro.h"
+#include "llvm/MC/MCParser/MCParsedAsmOperand.h"
 #include "llvm/Support/SMLoc.h"
 #include <cstdint>
 #include <string>
@@ -146,6 +147,9 @@ protected: // Can only create subclasses.
   bool ShowParsedOperands = false;
 
 public:
+  void (*EmitInstructionOperands)(SmallVector<std::unique_ptr<MCParsedAsmOperand>, 8> &&Operands, void *Context) = nullptr;
+  void *EmitInstructionOperandsContext = nullptr;
+
   MCAsmParser(const MCAsmParser &) = delete;
   MCAsmParser &operator=(const MCAsmParser &) = delete;
   virtual ~MCAsmParser();
