@@ -776,6 +776,44 @@ HoverInfo getHoverContents(const DefinedMacro &Macro, const syntax::Token &Tok,
     }
   }
 
+  if (auto *AsmAST = AST.getAsmAst()) {
+    auto MaybeExpansionText = AsmAST->TokenBuffer->getMacroExpansion(SM.getExpansionLoc(Tok.location()), SM);
+
+    if (!MaybeExpansionText) {
+      return HI;
+    }
+
+    std::string ExpansionText = *MaybeExpansionText;
+
+    llvm::SourceMgr MacroSrcMgr;
+    std::unique_ptr<llvm::MemoryBuffer> DefBuffer = llvm::MemoryBuffer::getMemBuffer(ExpansionText, "", false);
+    MacroSrcMgr.AddNewSourceBuffer(std::move(DefBuffer), llvm::SMLoc());
+    std::unique_ptr<llvm::MCStreamer> Str(llvm::createNullStreamer(*AsmAST->Ctx));
+    std::unique_ptr<llvm::MCAsmParser> Parser(llvm::createMCAsmParser(MacroSrcMgr, *AsmAST->Ctx, *Str, *AsmAST->MAI));
+    std::unique_ptr<llvm::MCTargetAsmParser> TAP(AsmAST->TheTarget->createMCAsmParser(*AsmAST->STI, *Parser, *AsmAST->MCII, AsmAST->MCOptions));
+    Parser->setTargetParser(*TAP);
+
+    std::string Formatted;
+    llvm::raw_string_ostream FormattedStr(Formatted);
+
+    Parser->Lex();
+
+    while (true) {
+      FormattedStr << Parser->parseStringToEndOfStatement() << Parser->getTok().getString() << "\n";
+      if (Parser->getTok().is(llvm::AsmToken::Eof))
+        break;
+      Parser->Lex();
+    }
+
+    FormattedStr.flush();
+    ExpansionText = Formatted;
+
+    // newlines separate the CPP expansion from the ASM expansion in simple macros
+    HI.Definition += "\n\n// Expands to\n" + ExpansionText;
+
+    return HI;
+  }
+
   if (auto Expansion = AST.getTokens().expansionStartingAt(&Tok)) {
     // We drop expansion that's longer than the threshold.
     // For extremely long expansion text, it's not readable from hover card
