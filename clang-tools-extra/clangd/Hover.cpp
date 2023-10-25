@@ -57,6 +57,7 @@
 #include "llvm/Support/Format.h"
 #include "llvm/Support/ScopedPrinter.h"
 #include "llvm/Support/raw_ostream.h"
+#include "asm/InstructionDocs.h"
 #include <algorithm>
 #include <optional>
 #include <string>
@@ -1354,6 +1355,68 @@ std::optional<HoverInfo> getHover(ParsedAST &AST, Position Pos,
   // Macros and deducedtype only works on identifiers and auto/decltype keywords
   // respectively. Therefore they are only trggered on whichever works for them,
   // similar to SelectionTree::create().
+
+  if (auto *AsmAST = AST.getAsmAst()) {
+    for (const auto &Tok : TokensTouchingCursor) {
+      if (Tok.kind() == tok::identifier) {
+        // Prefer the identifier token as a fallback highlighting range.
+        HighlightRange = Tok.range(SM).toCharRange(SM);
+
+        if (auto M = locateMacroAt(Tok, AST.getPreprocessor())) {
+          HoverCountMetric.record(1, "macro");
+
+          HI = getHoverContents(*M, Tok, AST);
+          if (auto DefLoc = M->Info->getDefinitionLoc(); DefLoc.isValid()) {
+            include_cleaner::Macro IncludeCleanerMacro { AST.getPreprocessor().getIdentifierInfo(Tok.text(SM)), DefLoc };
+            maybeAddSymbolProviders(AST, *HI, include_cleaner::Symbol{IncludeCleanerMacro});
+          }
+
+          break;
+        }
+
+        if (!HI.has_value()) {
+          auto AsmOffset = AsmAST->TokenBuffer->getAsmOffset(Tok.location(), AST.getSourceManager());
+          auto *AsmMemStart = AsmAST->TokenBuffer->AsmBuffer.data();
+
+          for (const auto &AI : AsmAST->Str->InstructionsWithArgc) {
+            auto InstrAsmOffset = AI.Inst.getLoc().getPointer() - AsmMemStart;
+            if (AsmOffset != InstrAsmOffset)
+              continue;
+
+            auto InstName = Tok.text(SM).upper();
+
+            if (AI.IsDot)
+              InstName += ".";
+
+            llvm::errs() << "Looking for " << InstName << " with " << AI.Argc << " args\n";
+
+            const auto MaybeDoc = PpcAsmDocs::getDocsForInstr(Tok.text(SM).upper(), AI);
+            if (MaybeDoc.has_value()) {
+              HI = HoverInfo();
+              HI->RawOutput = markup::Document();
+              HI->Name = Tok.text(SM);
+              HI->Kind = index::SymbolKind::Function;
+              MaybeDoc->print(*HI->RawOutput);
+            }
+
+            break;
+          }
+        }
+      }
+
+      if (HI.has_value())
+        break;
+    }
+
+    if (!HI)
+      return std::nullopt;
+
+    HI->DefinitionLanguage = "powerpc";
+    HI->SymRange = halfOpenToRange(SM, HighlightRange);
+
+    return HI;
+  }
+
   for (const auto &Tok : TokensTouchingCursor) {
     if (Tok.kind() == tok::identifier) {
       // Prefer the identifier token as a fallback highlighting range.
@@ -1459,6 +1522,9 @@ static std::string formatOffset(uint64_t OffsetInBits) {
 }
 
 markup::Document HoverInfo::present() const {
+  if (this->RawOutput.has_value())
+    return *this->RawOutput;
+
   markup::Document Output;
 
   // Header contains a text of the form:

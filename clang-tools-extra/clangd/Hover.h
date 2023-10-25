@@ -118,6 +118,8 @@ struct HoverInfo {
   // alphabetical order.
   std::vector<std::string> UsedSymbolNames;
 
+  std::optional<markup::Document> RawOutput;
+
   /// Produce a user-readable information.
   markup::Document present() const;
 };

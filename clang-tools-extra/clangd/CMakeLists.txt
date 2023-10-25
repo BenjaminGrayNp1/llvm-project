@@ -72,6 +72,7 @@ include_directories(BEFORE "${CMAKE_CURRENT_SOURCE_DIR}/../include-cleaner/inclu
 add_clang_library(clangDaemon
   asm/AsmAst.cpp
   asm/AsmTokens.cpp
+  asm/InstructionDocs.cpp
   AST.cpp
   ASTSignals.cpp
   ClangdLSPServer.cpp
