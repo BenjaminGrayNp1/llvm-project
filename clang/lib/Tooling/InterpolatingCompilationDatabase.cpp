@@ -118,6 +118,9 @@ static types::ID foldType(types::ID Lang) {
   case types::TY_CUDA:
   case types::TY_CUDA_DEVICE:
     return types::TY_CUDA;
+  case types::TY_Asm:
+  case types::TY_PP_Asm:
+    return types::TY_Asm;
   default:
     return types::TY_INVALID;
   }

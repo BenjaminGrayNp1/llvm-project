@@ -1323,6 +1323,10 @@ public:
     OnToken = std::move(F);
   }
 
+  llvm::unique_function<void(const clang::Token &)> yoinkTokenWatcher() {
+    return std::move(OnToken);
+  }
+
   void setPreprocessToken(bool Preprocess) { PreprocessToken = Preprocess; }
 
   bool isMacroDefined(StringRef Id) {

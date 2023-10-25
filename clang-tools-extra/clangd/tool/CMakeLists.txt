@@ -13,6 +13,15 @@ add_clang_tool(clangd
 
 set(LLVM_LINK_COMPONENTS
   support
+  AllTargetsAsmParsers
+  AllTargetsDescs
+  AllTargetsDisassemblers
+  AllTargetsInfos
+  MC
+  MCParser
+  Support
+  TargetParser
+  LLVMMC
   )
 
 set(CLANGD_XPC_LIBS "")
@@ -33,6 +42,7 @@ clang_target_link_libraries(clangdMain
 target_link_libraries(clangdMain
   PRIVATE
   clangTidy
+  LLVMMC
 
   clangDaemon
   clangdRemoteIndex

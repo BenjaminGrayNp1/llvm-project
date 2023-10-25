@@ -26,6 +26,7 @@
 #include "Preamble.h"
 #include "SourceCode.h"
 #include "TidyProvider.h"
+#include "asm/AsmAst.h"
 #include "clang-include-cleaner/Record.h"
 #include "index/Symbol.h"
 #include "support/Logger.h"
@@ -414,9 +415,27 @@ ParsedAST::build(llvm::StringRef Filename, const ParseInputs &Inputs,
 
   if (CI->getFrontendOpts().Inputs.size() > 0) {
     auto Lang = CI->getFrontendOpts().Inputs[0].getKind().getLanguage();
-    if (Lang == Language::Asm || Lang == Language::LLVM_IR) {
-      elog("Clangd does not support assembly or IR source files");
+    if (Lang == Language::LLVM_IR) {
+      elog("Clangd does not support IR source files");
       return std::nullopt;
+    }
+
+    if (Lang == Language::Asm) {
+      llvm::errs() << "Building assembly file\n";
+
+      auto AA = std::make_unique<AsmAst>(Filename);
+      AA->setInvocation(std::make_unique<CompilerInvocation>(*CI));  /* This is a deep copy */
+      AA->setSourceBuffer(llvm::MemoryBuffer::getMemBufferCopy(Inputs.Contents, Filename));
+      AA->parseAsm(VFS);
+
+      ParsedAST Result(Filename, Inputs.Version, std::move(Preamble),
+                      std::move(AA->Clang), std::move(AA->Action), std::move(*AA->SyntaxTokenBuffer),
+                      std::move(AA->Macros), std::vector<PragmaMark>(), std::vector<Decl *>(),
+                      std::move(AA->Diags), std::move(AA->Includes));
+
+      Result.setAsmAst(std::move(AA));
+
+      return std::move(Result);
     }
   }
 

@@ -25,6 +25,7 @@
 #include "Diagnostics.h"
 #include "Headers.h"
 #include "Preamble.h"
+#include "asm/AsmAst.h"
 #include "clang-include-cleaner/Record.h"
 #include "support/Path.h"
 #include "clang/Frontend/FrontendAction.h"
@@ -122,6 +123,14 @@ public:
     return Resolver.get();
   }
 
+  void setAsmAst(std::unique_ptr<AsmAst> &&AsmAst) {
+    this->AsmAstP = std::move(AsmAst);
+  }
+
+  AsmAst *getAsmAst() const {
+    return AsmAstP.get();
+  }
+
 private:
   ParsedAST(PathRef TUPath, llvm::StringRef Version,
             std::shared_ptr<const PreambleData> Preamble,
@@ -160,6 +169,7 @@ private:
   std::vector<Decl *> LocalTopLevelDecls;
   IncludeStructure Includes;
   std::unique_ptr<HeuristicResolver> Resolver;
+  std::unique_ptr<AsmAst> AsmAstP;
 };
 
 } // namespace clangd

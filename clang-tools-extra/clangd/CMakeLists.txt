@@ -45,6 +45,14 @@ set(LLVM_LINK_COMPONENTS
   FrontendOpenMP
   Option
   TargetParser
+  AllTargetsAsmParsers
+  AllTargetsDescs
+  AllTargetsDisassemblers
+  AllTargetsInfos
+  MC
+  MCParser
+  Support
+  TargetParser
   )
 
 set(COMPLETIONMODEL_SOURCES)
@@ -62,6 +70,8 @@ include_directories(BEFORE "${CMAKE_CURRENT_BINARY_DIR}/../clang-tidy")
 include_directories(BEFORE "${CMAKE_CURRENT_SOURCE_DIR}/../include-cleaner/include")
 
 add_clang_library(clangDaemon
+  asm/AsmAst.cpp
+  asm/AsmTokens.cpp
   AST.cpp
   ASTSignals.cpp
   ClangdLSPServer.cpp
@@ -184,6 +194,7 @@ target_link_libraries(clangDaemon
   clangTidy
 
   clangdSupport
+  LLVMMC
   )
 if(CLANGD_TIDY_CHECKS)
   target_link_libraries(clangDaemon PRIVATE ${ALL_CLANG_TIDY_CHECKS})
