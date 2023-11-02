@@ -391,6 +391,10 @@ def ConvertFuncToLLVMPass : Pass<"convert-func-to-llvm", "ModuleOp"> {
     1 value is returned, packed into an LLVM IR struct type. Function calls and
     returns are updated accordingly. Block argument types are updated to use
     LLVM IR types.
+
+    Note that until https://github.com/llvm/llvm-project/issues/70982 is resolved,
+    this pass includes patterns that lower `arith` and `cf` to LLVM. This is legacy
+    code due to when they were all converted in the same pass.
   }];
   let dependentDialects = ["LLVM::LLVMDialect"];
   let options = [
@@ -495,10 +499,7 @@ def ConvertGpuOpsToNVVMOps : Pass<"convert-gpu-to-nvvm", "gpu::GPUModuleOp"> {
     Option<"useBarePtrCallConv", "use-bare-ptr-memref-call-conv", "bool",
            /*default=*/"false",
            "Replace memref arguments in GPU functions with bare pointers. "
-           "All memrefs must have static shape.">,
-    Option<"useOpaquePointers", "use-opaque-pointers", "bool",
-                   /*default=*/"true", "Generate LLVM IR using opaque pointers "
-                   "instead of typed pointers">,
+           "All memrefs must have static shape.">
   ];
 }
 
@@ -532,10 +533,7 @@ def ConvertGpuOpsToROCDLOps : Pass<"convert-gpu-to-rocdl", "gpu::GPUModuleOp"> {
             clEnumValN(::mlir::gpu::amd::Runtime::Unknown, "unknown", "Unknown (default)"),
             clEnumValN(::mlir::gpu::amd::Runtime::HIP, "HIP", "HIP"),
             clEnumValN(::mlir::gpu::amd::Runtime::OpenCL, "OpenCL", "OpenCL")
-          )}]>,
-    Option<"useOpaquePointers", "use-opaque-pointers", "bool",
-               /*default=*/"true", "Generate LLVM IR using opaque pointers "
-               "instead of typed pointers">,
+          )}]>
   ];
 }
 
@@ -591,12 +589,6 @@ def ConvertVulkanLaunchFuncToVulkanCallsPass
   let description = [{
     This pass is only intended for the mlir-vulkan-runner.
   }];
-
-  let options = [
-     Option<"useOpaquePointers", "use-opaque-pointers", "bool",
-            /*default=*/"true", "Generate LLVM IR using opaque pointers "
-            "instead of typed pointers">
-  ];
 
   let dependentDialects = ["LLVM::LLVMDialect"];
 }
