@@ -265,8 +265,11 @@ void PpcAsmDocs::init(void)
 	if (DocsPath == nullptr)
 		return;
 
+	llvm::errs() << "Looking for PPC docs in " << DocsPath << "\n";
+
 	auto Buffer = llvm::MemoryBuffer::getFile(DocsPath);
-	if (Buffer->get() == nullptr) {
+
+	if (auto Err = Buffer.getError()) {
 		llvm::errs() << "failed to read Clangd docs JSON file\n";
 		return;
 	}
