@@ -130,7 +130,7 @@ private:
     if (Env.getValue(Cond) == nullptr)
       transfer(StmtToEnv, Cond, Env);
 
-    auto *Val = cast_or_null<BoolValue>(Env.getValue(Cond));
+    auto *Val = Env.get<BoolValue>(Cond);
     // Value merging depends on flow conditions from different environments
     // being mutually exclusive -- that is, they cannot both be true in their
     // entirety (even if they may share some clauses). So, we need *some* value
@@ -498,8 +498,17 @@ runTypeErasedDataflowAnalysis(
     const Environment &InitEnv,
     std::function<void(const CFGElement &,
                        const TypeErasedDataflowAnalysisState &)>
-        PostVisitCFG) {
+        PostVisitCFG,
+    std::int32_t MaxBlockVisits) {
   PrettyStackTraceAnalysis CrashInfo(CFCtx, "runTypeErasedDataflowAnalysis");
+
+  std::optional<Environment> MaybeStartingEnv;
+  if (InitEnv.callStackSize() == 1) {
+    MaybeStartingEnv = InitEnv.fork();
+    MaybeStartingEnv->initialize();
+  }
+  const Environment &StartingEnv =
+      MaybeStartingEnv ? *MaybeStartingEnv : InitEnv;
 
   const clang::CFG &CFG = CFCtx.getCFG();
   PostOrderCFGView POV(&CFG);
@@ -511,32 +520,25 @@ runTypeErasedDataflowAnalysis(
   // The entry basic block doesn't contain statements so it can be skipped.
   const CFGBlock &Entry = CFG.getEntry();
   BlockStates[Entry.getBlockID()] = {Analysis.typeErasedInitialElement(),
-                                     InitEnv.fork()};
+                                     StartingEnv.fork()};
   Worklist.enqueueSuccessors(&Entry);
 
-  AnalysisContext AC(CFCtx, Analysis, InitEnv, BlockStates);
+  AnalysisContext AC(CFCtx, Analysis, StartingEnv, BlockStates);
 
-  // Bugs in lattices and transfer functions can prevent the analysis from
-  // converging. To limit the damage (infinite loops) that these bugs can cause,
-  // limit the number of iterations.
-  // FIXME: Consider making the maximum number of iterations configurable.
-  // FIXME: Consider restricting the number of backedges followed, rather than
-  // iterations.
-  // FIXME: Set up statistics (see llvm/ADT/Statistic.h) to count average number
-  // of iterations, number of functions that time out, etc.
-  static constexpr uint32_t MaxAverageVisitsPerBlock = 4;
-  static constexpr uint32_t AbsoluteMaxIterations = 1 << 16;
-  const uint32_t RelativeMaxIterations =
+  // FIXME: remove relative cap. There isn't really any good setting for
+  // `MaxAverageVisitsPerBlock`, so it has no clear value over using
+  // `MaxBlockVisits` directly.
+  static constexpr std::int32_t MaxAverageVisitsPerBlock = 4;
+  const std::int32_t RelativeMaxBlockVisits =
       MaxAverageVisitsPerBlock * BlockStates.size();
-  const uint32_t MaxIterations =
-      std::min(RelativeMaxIterations, AbsoluteMaxIterations);
-  uint32_t Iterations = 0;
+  MaxBlockVisits = std::min(RelativeMaxBlockVisits, MaxBlockVisits);
+  std::int32_t BlockVisits = 0;
   while (const CFGBlock *Block = Worklist.dequeue()) {
     LLVM_DEBUG(llvm::dbgs()
                << "Processing Block " << Block->getBlockID() << "\n");
-    if (++Iterations > MaxIterations) {
+    if (++BlockVisits > MaxBlockVisits) {
       return llvm::createStringError(std::errc::timed_out,
-                                     "maximum number of iterations reached");
+                                     "maximum number of blocks processed");
     }
 
     const std::optional<TypeErasedDataflowAnalysisState> &OldBlockState =
