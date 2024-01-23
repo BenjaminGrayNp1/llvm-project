@@ -431,7 +431,7 @@ ParsedAST::build(llvm::StringRef Filename, const ParseInputs &Inputs,
       ParsedAST Result(Filename, Inputs.Version, std::move(Preamble),
                       std::move(AA->Clang), std::move(AA->Action), std::move(*AA->SyntaxTokenBuffer),
                       std::move(AA->Macros), std::vector<PragmaMark>(), std::vector<Decl *>(),
-                      std::move(AA->Diags), std::move(AA->Includes));
+                      std::move(AA->Diags), std::move(AA->Includes), include_cleaner::PragmaIncludes());
 
       Result.setAsmAst(std::move(AA));
 
